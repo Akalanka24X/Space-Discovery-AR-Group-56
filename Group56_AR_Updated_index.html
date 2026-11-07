@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#dfeaf1">
+<title>Space Discovery AR — Group 56</title>
+
+<!-- Keep the versions used in the supplied lecture guide. -->
+<script src="https://aframe.io/releases/1.3.0/aframe.min.js"
+        onerror="window.__aframeLoadFailed=true"></script>
+<script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"
+        onerror="window.__arjsLoadFailed=true"></script>
+
+<style>
+  :root { --navy:#082039; --blue:#155477; --cyan:#55d8f4; --glass:rgba(5,26,48,.88); }
+  * { box-sizing:border-box; }
+  html, body { width:100%; height:100%; margin:0; overflow:hidden; }
+  body {
+    font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    background:linear-gradient(145deg,#edf4f8 0%,#c8dce8 50%,#a9c6d7 100%);
+  }
+  /* Keep the AR camera image visible behind A-Frame's transparent WebGL canvas. */
+  a-scene, .a-canvas, canvas.a-canvas { background:transparent !important; }
+  #status {
+    position:fixed; z-index:10020; top:0; left:0; right:0;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 10px;
+    color:#fff; background:#a43b35; text-align:center;
+    font-size:13px; font-weight:850; letter-spacing:.2px;
+    border-bottom:1px solid #ffffff55; box-shadow:0 2px 10px #0002;
+  }
+  #brand, #mission {
+    position:fixed; z-index:10010; top:58px;
+    border:1px solid #61dff099; border-radius:13px;
+    color:#fff; background:var(--glass); box-shadow:0 5px 18px #0003;
+    pointer-events:none;
+  }
+  #brand { left:12px; padding:9px 12px; }
+  #brand b { display:block; color:#83eaff; font-size:12px; letter-spacing:1.3px; }
+  #brand span { display:block; margin-top:3px; color:#e2f1fb; font-size:9px; }
+  #mission { right:12px; width:min(42vw,184px); padding:9px 11px; text-align:right; }
+  #mission small { color:#83eaff; font-size:9px; font-weight:900; letter-spacing:1px; }
+  #mission div { margin-top:4px; font-size:11px; line-height:1.35; }
+  #cameraHelp {
+    display:none; position:fixed; z-index:10015; top:118px; left:50%;
+    transform:translateX(-50%); width:min(92vw,520px); padding:10px 13px;
+    border:1px solid #c98735; border-radius:12px; background:rgba(255,248,226,.96);
+    color:#563814; box-shadow:0 5px 16px #0002; font-size:12px; line-height:1.4;
+    text-align:center;
+  }
+  #help {
+    position:fixed; z-index:10010; left:50%;
+    bottom:calc(112px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    max-width:94vw; padding:7px 12px; border:1px solid #69cfe6;
+    border-radius:20px; background:var(--glass); color:#fff;
+    font-size:11px; white-space:nowrap; pointer-events:none;
+  }
+  #controls {
+    position:fixed; z-index:10030; left:0; right:0;
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    display:flex; flex-wrap:wrap; justify-content:center; gap:7px; padding:0 8px;
+    pointer-events:none;
+  }
+  #controls button {
+    pointer-events:auto; min-height:42px; padding:10px 13px;
+    border:1px solid #63cfe9; border-radius:22px;
+    background:rgba(9,47,76,.96); color:white; font-size:11px; font-weight:900;
+    box-shadow:0 3px 11px #0003; cursor:pointer; touch-action:manipulation;
+  }
+  #controls button.primary { background:rgba(118,73,17,.96); border-color:#ffd27b; }
+  #controls button.reset { background:rgba(46,62,79,.96); border-color:#ffffff99; }
+  #controls button:active { transform:scale(.97); }
+  #toast {
+    position:fixed; z-index:10040; left:50%;
+    bottom:calc(68px + env(safe-area-inset-bottom)); transform:translate(-50%,10px);
+    opacity:0; max-width:90vw; padding:9px 14px; border:1px solid #69d9f3;
+    border-radius:20px; background:var(--glass); color:#fff; font-size:12px;
+    font-weight:750; text-align:center; transition:opacity .18s,transform .18s;
+    pointer-events:none;
+  }
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  #loading {
+    position:fixed; z-index:10050; inset:0; display:flex; align-items:center;
+    justify-content:center; padding:22px; background:rgba(232,242,248,.88);
+    color:#12324b; text-align:center; transition:opacity .3s;
+  }
+  #loading.hidden { opacity:0; pointer-events:none; }
+  #loading .panel { max-width:340px; padding:20px 24px; border:1px solid #99c5d7;
+    border-radius:18px; background:rgba(255,255,255,.94); box-shadow:0 8px 28px #25465a22; }
+  #loading b { color:#126082; letter-spacing:1px; }
+  #loading p { color:#34566e; font-size:13px; line-height:1.5; }
+  #loading .spinner { width:34px; height:34px; margin:0 auto 12px; border:3px solid #c7dce6;
+    border-top-color:#1688ae; border-radius:50%; animation:spin .9s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media(max-width:520px) {
+    #status { font-size:11px; }
+    #brand { top:54px; left:8px; padding:8px 9px; }
+    #brand b { font-size:10px; } #brand span { font-size:8px; }
+    #mission { top:54px; right:8px; width:132px; padding:8px; }
+    #mission div { font-size:10px; }
+    #controls { gap:6px; }
+    #controls button { min-height:39px; padding:9px 10px; font-size:9px; }
+    #help { bottom:calc(108px + env(safe-area-inset-bottom)); font-size:10px; }
+    #cameraHelp { top:112px; }
+  }
+  @media(prefers-reduced-motion:reduce) {
+    #loading .spinner { animation-duration:3s; }
+    #toast { transition:none; }
+  }
+</style>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  let toastTimer = 0, cameraStarted = false, cameraFailed = false;
+
+  function notify(message) {
+    const toast = $('#toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1600);
+  }
+
+  function cameraReady() {
+    cameraStarted = true;
+    $('#status').textContent = 'Camera connected — show the full Hiro marker';
+    $('#status').style.background = '#176b50';
+    $('#missionText').textContent = 'Camera ready • Searching for Hiro marker';
+    $('#cameraHelp').style.display = 'none';
+    $('#loading').classList.add('hidden');
+  }
+  function cameraError(error) {
+    cameraFailed = true;
+    const message = error && (error.name || error.message) ? (error.name || error.message) : 'Camera permission or device problem';
+    $('#status').textContent = 'Camera could not start — check browser permission';
+    $('#status').style.background = '#a43b35';
+    $('#missionText').textContent = 'Camera unavailable';
+    $('#cameraHelp').textContent =
+      'Camera not starting? In Brave, click the site controls icon beside the address, set Camera to Allow, close other apps using the webcam, then reload this page. Use HTTPS or localhost.';
+    $('#cameraHelp').style.display = 'block';
+    $('#loading').classList.add('hidden');
+    notify(message);
+  }
+
+  // Register custom components only after A-Frame has loaded.
+  function registerComponents() {
+    if (!window.AFRAME || window.__spaceComponentsRegistered) return;
+    window.__spaceComponentsRegistered = true;
+
+    AFRAME.registerComponent('planet-controller', {
+      init() {
+        this.palette = ['#ff5577','#ffd166','#06d6a0','#4cc9f0','#b388ff'];
+        this.index = 0;
+        this.el.addEventListener('click', () => this.next());
+        this.el.addEventListener('planet-next', () => this.next());
+        this.el.addEventListener('planet-reset', () => this.reset());
+      },
+      next() {
+        this.index = (this.index + 1) % this.palette.length;
+        this.el.setAttribute('material','color',this.palette[this.index]);
+        notify('Planet colour changed');
+      },
+      reset() {
+        this.index = 0;
+        this.el.setAttribute('material','color',this.palette[0]);
+      }
+    });
+
+    AFRAME.registerComponent('satellite-controller', {
+      init() {
+        this.big = false;
+        this.from = 1;
+        this.to = 1;
+        this.started = null;
+        this.duration = 300;
+        this.el.object3D.scale.setScalar(1);
+        this.el.addEventListener('satellite-toggle', () => this.toggle());
+        this.el.addEventListener('satellite-reset', () => this.reset());
+      },
+      toggle() {
+        this.big = !this.big;
+        this.from = this.el.object3D.scale.x;
+        this.to = this.big ? 1.4 : 1;
+        this.started = false;
+        notify(this.big ? 'Satellite enlarged' : 'Satellite restored');
+      },
+      reset() {
+        this.big = false;
+        this.from = this.el.object3D.scale.x;
+        this.to = 1;
+        this.started = false;
+      },
+      tick(time) {
+        if (this.started === null) return;
+        if (this.started === false) this.started = time;
+        const p = Math.min(1,(time-this.started)/this.duration);
+        const eased = 1-Math.pow(1-p,3);
+        const s = this.from+(this.to-this.from)*eased;
+        this.el.object3D.scale.set(s,s,s);
+        if (p >= 1) this.started = null;
+      }
+    });
+
+    AFRAME.registerComponent('satellite-part', {
+      init() {
+        this.el.addEventListener('click', () => {
+          if (this.el.parentEl) this.el.parentEl.emit('satellite-toggle');
+        });
+      }
+    });
+
+    AFRAME.registerComponent('rocket-flight', {
+      init() {
+        this.baseY = 0;
+        this.startY = 0;
+        this.targetY = 0;
+        this.started = null;
+        this.duration = 1000;
+        this.launched = false;
+        this.el.addEventListener('rocket-toggle', () => this.toggle());
+        this.el.addEventListener('rocket-reset', () => this.reset());
+      },
+      toggle() {
+        this.launched = !this.launched;
+        this.startY = this.el.object3D.position.y;
+        this.targetY = this.baseY + (this.launched ? 0.85 : 0);
+        this.started = false;
+        const btn = $('#rocketButton');
+        if (btn) btn.textContent = this.launched ? '↩ RETURN ROCKET' : '🚀 LAUNCH ROCKET';
+        notify(this.launched ? 'Rocket launch sequence!' : 'Rocket returning to base');
+      },
+      reset() {
+        this.launched = false;
+        this.startY = this.el.object3D.position.y;
+        this.targetY = this.baseY;
+        this.started = false;
+        const btn = $('#rocketButton');
+        if (btn) btn.textContent = '🚀 LAUNCH ROCKET';
+      },
+      tick(time) {
+        if (this.started === null) return;
+        if (this.started === false) this.started = time;
+        const p = Math.min(1,(time-this.started)/this.duration);
+        const eased = p < .5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
+        this.el.object3D.position.y = this.startY+(this.targetY-this.startY)*eased;
+        if (p >= 1) this.started = null;
+      }
+    });
+
+    AFRAME.registerComponent('rocket-trigger', {
+      init() {
+        this.el.addEventListener('click', () => {
+          if (this.el.parentEl) this.el.parentEl.emit('rocket-toggle');
+        });
+      }
+    });
+
+    AFRAME.registerComponent('marker-status', {
+      init() {
+        this.el.addEventListener('markerFound', () => {
+          $('#status').textContent = '✓ HIRO MARKER FOUND — MISSION ACTIVE';
+          $('#status').style.background = '#176b50';
+          $('#missionText').textContent = 'Marker locked • Explore the exhibit';
+        });
+        this.el.addEventListener('markerLost', () => {
+          $('#status').textContent = 'Marker not visible — reposition it';
+          $('#status').style.background = '#a43b35';
+          $('#missionText').textContent = 'Show the full Hiro marker';
+        });
+      }
+    });
+  }
+
+  function attachSceneEvents(scene) {
+    // Attach immediately on DOM ready, not after scene-loaded; AR.js may initialise its webcam early.
+    scene.addEventListener('camera-init', cameraReady);
+    scene.addEventListener('arjs-video-loaded', cameraReady);
+    scene.addEventListener('camera-error', (e) => cameraError(e.detail && (e.detail.error || e.detail)));
+  }
+
+  // Install component definitions now, before the <a-scene> markup is parsed.
+  // Keep the load fallback only for slow/unusual library-loading situations.
+  registerComponents();
+  window.addEventListener('load', registerComponents, { once: true });
+
+  // Capture AR.js lifecycle events at document level as early as possible.
+  document.addEventListener('camera-init', cameraReady, true);
+  document.addEventListener('arjs-video-loaded', cameraReady, true);
+  document.addEventListener('camera-error', (e) => cameraError(e.detail && (e.detail.error || e.detail)), true);
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const scene = $('a-scene');
+    if (!scene) {
+      cameraError(new Error('AR scene element missing'));
+      return;
+    }
+
+    attachSceneEvents(scene);
+
+    const retry = $('#retryButton');
+    retry.addEventListener('click', () => location.reload());
+
+    $('#rocketButton').addEventListener('click', () => $('#rocketAssembly').emit('rocket-toggle'));
+    $('#planetButton').addEventListener('click', () => $('#planet').emit('planet-next'));
+    $('#satelliteButton').addEventListener('click', () => $('#satellite').emit('satellite-toggle'));
+    $('#resetButton').addEventListener('click', () => {
+      $('#rocketAssembly').emit('rocket-reset');
+      $('#planet').emit('planet-reset');
+      $('#satellite').emit('satellite-reset');
+      notify('Exhibit reset');
+    });
+
+    const model = $('#rocketModel');
+    const fallback = $('#rocketFallback');
+    model.addEventListener('model-loaded', () => {
+      fallback.setAttribute('visible',false);
+    });
+    model.addEventListener('model-error', () => {
+      model.setAttribute('visible',false);
+      fallback.setAttribute('visible',true);
+      notify('Using built-in rocket model backup');
+    });
+
+    if (window.__aframeLoadFailed || window.__arjsLoadFailed) {
+      cameraError(new Error('AR library could not load — check internet connection'));
+    } else if (!window.isSecureContext) {
+      cameraError(new Error('Camera requires HTTPS or localhost'));
+    } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      cameraError(new Error('This browser does not provide camera access'));
+    }
+
+    // A clear timeout message is more useful than leaving the original "Starting" message forever.
+    setTimeout(() => {
+      if (!cameraStarted && !cameraFailed) cameraError(new Error('No camera-init event received'));
+    }, 11000);
+
+    window.addEventListener('online', () => {
+      if (!cameraStarted) notify('Internet restored — reload to retry AR libraries');
+    });
+    window.addEventListener('offline', () => {
+      $('#cameraHelp').textContent = 'Internet is required to load A-Frame and AR.js. Reconnect, then reload.';
+      $('#cameraHelp').style.display = 'block';
+    });
+  });
+
+})();
+</script>
+</head>
+<body>
+  <div id="status" role="status" aria-live="polite">Starting camera…</div>
+  <div id="brand"><b>SPACE DISCOVERY</b><span>INTERACTIVE AR MUSEUM • GROUP 56</span></div>
+  <div id="mission"><small>MISSION CONTROL</small><div id="missionText">Allow camera access, then show Hiro marker</div></div>
+  <div id="cameraHelp"></div>
+  <div id="help">Point camera at the Hiro marker • Use on-screen controls if object taps are difficult</div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <div id="controls">
+    <button class="primary" id="rocketButton" type="button">🚀 LAUNCH ROCKET</button>
+    <button id="planetButton" type="button">🪐 CHANGE PLANET</button>
+    <button id="satelliteButton" type="button">🛰 GROW SATELLITE</button>
+    <button class="reset" id="resetButton" type="button">↻ RESET</button>
+  </div>
+
+  <div id="loading">
+    <div class="panel">
+      <div class="spinner"></div>
+      <b>SPACE DISCOVERY AR</b>
+      <p>Starting the camera and 3D exhibit…<br>Allow camera access when the browser asks.</p>
+      <button id="retryButton" type="button">Reload camera</button>
+    </div>
+  </div>
+
+  <a-scene embedded
+    vr-mode-ui="enabled: false"
+    renderer="alpha: true; antialias: true; colorManagement: true; logarithmicDepthBuffer: true;"
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+
+    <a-assets timeout="20000">
+      <a-asset-item id="rocket-asset" src="models/space-rocket.glb"></a-asset-item>
+    </a-assets>
+
+    <a-marker preset="hiro" marker-status smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="2">
+      <a-plane rotation="-90 0 0" width="1.95" height="1.95" color="#0b1d34"></a-plane>
+      <a-ring position="0 0.012 0" rotation="-90 0 0" radius-inner="0.91" radius-outer="0.93" color="#55d8f4"></a-ring>
+      <a-entity light="type: ambient; color: #ffffff; intensity: 1.15"></a-entity>
+      <a-entity light="type: directional; color: #ffffff; intensity: 0.65" position="-1 2 1"></a-entity>
+
+      <a-entity id="rocketAssembly" position="-0.55 0 -0.27" rocket-flight>
+        <a-entity id="rocketModel" gltf-model="#rocket-asset" position="0 0.62 0"
+          scale="0.43 0.43 0.43"
+          animation="property: rotation; to: 0 360 0; dur: 10000; easing: linear; loop: true"></a-entity>
+        <a-entity id="rocketFallback" visible="false" position="0 0.62 0">
+          <a-cylinder position="0 0 0" radius="0.19" height="0.72" color="#398fd1"></a-cylinder>
+          <a-cone position="0 0.52 0" radius-bottom="0.19" radius-top="0" height="0.36" color="#ffad4d"></a-cone>
+          <a-box position="-0.22 -0.25 0" width="0.23" height="0.25" depth="0.07" color="#e85c68"></a-box>
+          <a-box position="0.22 -0.25 0" width="0.23" height="0.25" depth="0.07" color="#e85c68"></a-box>
+          <a-sphere position="0 0.08 0.17" radius="0.07" color="#7de6f5"></a-sphere>
+        </a-entity>
+        <a-sphere class="clickable" rocket-trigger position="0 0.62 0" radius="0.46"
+          material="transparent: true; opacity: 0; depthWrite: false"></a-sphere>
+      </a-entity>
+      <a-text value="ROCKET" position="-0.55 1.22 -0.27" align="center" width="1.3" color="#ffffff"></a-text>
+
+      <a-sphere id="planet" class="clickable" planet-controller position="0.46 0.36 -0.27"
+        radius="0.22" material="color: #ff5577; roughness: 0.45"
+        animation="property: position; from: 0.46 0.31 -0.27; to: 0.46 0.66 -0.27; dir: alternate; dur: 1100; easing: easeInOutSine; loop: true"></a-sphere>
+      <a-torus position="0.46 0.36 -0.27" rotation="90 0 18" radius="0.32" radius-tubular="0.016" color="#ffd166"></a-torus>
+      <a-text value="PLANET" position="0.46 0.94 -0.27" align="center" width="1.15" color="#ffffff"></a-text>
+
+      <a-entity id="satellite" position="-0.52 0.22 0.45" satellite-controller>
+        <a-box class="clickable" satellite-part width="0.22" height="0.15" depth="0.20" color="#ffd166"></a-box>
+        <a-box class="clickable" satellite-part position="-0.25 0 0" width="0.25" height="0.035" depth="0.17" color="#80ed99"></a-box>
+        <a-box class="clickable" satellite-part position="0.25 0 0" width="0.25" height="0.035" depth="0.17" color="#80ed99"></a-box>
+      </a-entity>
+      <a-text value="SATELLITE" position="-0.52 0.54 0.45" align="center" width="1.4" color="#ffffff"></a-text>
+
+      <a-cylinder position="0.52 0.22 0.45" radius="0.12" height="0.34" color="#4cc9f0"
+        animation="property: rotation; to: 360 360 0; dur: 6500; easing: linear; loop: true"></a-cylinder>
+      <a-torus position="0.52 0.22 0.45" rotation="90 0 0" radius="0.18" radius-tubular="0.015" color="#b388ff"></a-torus>
+      <a-text value="SPACE STATION" position="0.52 0.53 0.45" align="center" width="1.55" color="#ffffff"></a-text>
+
+      <a-octahedron position="0 0.45 0.72" radius="0.055" color="#ffd166"
+        animation="property: rotation; to: 360 360 0; dur: 8000; easing: linear; loop: true"></a-octahedron>
+      <a-octahedron position="-0.10 0.68 -0.70" radius="0.04" color="#77e7ff"></a-octahedron>
+      <a-octahedron position="0.78 0.47 0" radius="0.045" color="#b388ff"></a-octahedron>
+      <a-text value="SPACE DISCOVERY" position="0 1.16 0.76" align="center" width="2.2" color="#77e7ff"></a-text>
+    </a-marker>
+
+    <a-entity camera cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .clickable; far: 20; interval: 0"></a-entity>
+  </a-scene>
+</body>
+</html>
